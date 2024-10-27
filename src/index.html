@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>DCTweaker2</title>
+    <link href="./style.css" rel="stylesheet" />
+</head>
+<body>
+    <script type="module">
+        import './pspHost.ts'
+    </script>
+    <psp-host id="#psp-host">
+        <template shadowrootmode="open">
+            <link href="dcstyle.css" rel="stylesheet">
+            <div class="error-notice"><slot name="error-message"></slot></div>
+            <div class='staging-area'>
+                <div class="staging-left">
+                    <i>Samples</i>
+                    <div class='image-samples'>
+                        <img onclick="_act('sampleChoice', event)" src="/celeste.jpg" />
+                        <img onclick="_act('sampleChoice', event)" src="/me.jpg" />
+                        <img onclick="_act('sampleChoice', event)" src="/train.png" />
+                    </div>
+                    <div class='imdrop'>
+                        <div id="drop-area">
+                            <p>To solve image cosines, choose a sample above, or drag and drop an image here.</p>
+                            <small>JPEG or PNG (no interlacing).</small>
+                            <div class="drop-tray">
+                                <slot name="drop-canvas"></slot>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class='editing-area'>
+                <div class='cosines'>
+                    <!-- <div class="slidecontainer">
+                        <input type="range" min="0.5" max="10" defaultValue="0.0" step="0.01" class="slider"
+                            id="contrast-picker" />
+                        Adjust Editor Contrast <span id="contrast-value"></span>
+                    </div> -->
+                    <table id="coordinates">
+                        <tbody>
+                            <tr class='crow'>
+                                <th>x</th>
+                                <td><slot name="coEditorMouseX">0</slot></td>
+                            </tr>
+                            <tr class='crow'>
+                                <th>y</th>
+                                <td><slot name="coEditorMouseY">0</slot></td>
+                            </tr>
+                            <tr class='crow'>
+                                <th>=</th>
+                                <td><slot name="coEditorMouseV">&oslash;</slot></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="scope-container" >
+                        <slot name="coScope">
+                            <canvas width="1" height="1" onmousemove="_act('coScopePoint', event)"></canvas>
+                            <div class="scope-shade">Waiting...</div>
+                        </slot>
+                    </div>
+                </div>
+
+                <div class='reconstructions'>
+                    <div>
+                    </div>
+                    <div class="scope-container">
+                        <slot name="recoScope">
+                            <canvas width="1" height="1"></canvas>
+                            <div class="scope-shade">Waiting...</div>
+                        </slot>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </psp-host>
+</body>
+
+</html>

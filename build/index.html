@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>DCTweaker2</title>
+      <script type="module" crossorigin src="/static/index-DaKOjhqt.js"></script>
+      <link rel="stylesheet" crossorigin href="/static/style-C-4u5yYr.css">
+    </head>
+    <body>
+        <h1><a id="sevener" href="#">Hello, world!</a></h1>
+        <div class='staging-area'>
+            <div class="staging-left">
+              <i>Samples</i>
+              <div class='image-samples'>
+                  <img src="/celeste.jpg" />
+                  <img src="/me.jpg" />
+                  <img src="/train.png" />
+              </div>
+              <div class='imdrop'>
+                <div id="drop-area">
+                  <p>To solve image cosines, choose a sample above, or drag and drop an image here.</p>
+                  <small>JPEG or PNG (no interlacing).</small>
+                  <div class="preview-tray" ref={_dropBackdrop}></div>
+                </div>
+              </div>
+            </div>
+
+        </div>
+        <div className='editing-area'>
+            <CosineEditor />
+        </div>
+    </body>
+</html>

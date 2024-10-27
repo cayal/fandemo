@@ -1,0 +1,121 @@
+.highlight {
+    outline: 3px solid #646cff;
+    transition: ease-in 0.5s outline;
+}
+
+.staging-area {
+    outline: 1px solid orange;
+    display: flex;
+    flex-direction: row;
+}
+
+.editing-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.image-samples img {
+    cursor: pointer;
+    max-width: 64px;
+    border-radius: 3px;
+    margin: 0 8px;
+}
+
+.image-samples img:hover {
+    outline: 1px solid #646cff;
+}
+
+.imdrop #drop-area {
+    border: 2px dashed #ccc;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 256px;
+    height: 256px;
+    padding: 10px;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    color: #ccc;
+}
+
+.imdrop small {
+    font-style: italic;
+    display: block;
+    width: 300px;
+}
+
+img#color {
+    max-width: 100%;
+    height: auto;
+}
+
+img#result {
+    max-width: 100%;
+    height: auto;
+}
+
+.drop-tray {
+    position: absolute;
+    height: 256px;
+    width: 256px;
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.editing-area canvas {
+    width: 100%;
+    image-rendering: pixelated;
+    outline: 1px solid red;
+}
+
+i.notice {
+    color: rgb(255, 145, 0);
+    display: inline-block;
+    width: '256px';
+}
+
+#coordinates {
+    display: flex;
+    flex-direction: column;
+    line-height: 1em;
+}
+
+#coordinates tbody {
+    outline: 1px dotted grey;
+    border-radius: 3px;
+    max-width: 5em;
+    color: #555;
+    background: white;
+    font-weight: 600;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#coordinates td {
+    max-width: 3em;
+    overflow: hidden;
+    text-align: left;
+}
+
+#coordinates th {
+    width: 1em;
+    padding: 0.2em;
+    background-color: #646cff;
+    color: white;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-size: small;
+}
+
+.cosines,
+.reconstructions {
+    display: grid;
+    grid-template-rows: 7em 1fr;
+}
+
+.scope-container {
+    display: grid;
+    aspect-ratio: 1;
+    outline: 1px solid orange;
+}
