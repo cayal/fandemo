@@ -1,39 +1,221 @@
 import { Image } from 'image-js'
+import {DivDrain, FlatLens, GrowPSPModel, PSPActions, PSPGagReflex, PSPHost, PSPLens} from './pspHost'
+import {GroundCanvasToInnerHTML, GroundImageLens, resizeAndGreyscale, SampleImageClicked} from "./model/groundImage.ts";
+import {
+    CoScopeMouseLens,
+    CoScopeContrastPicked,
+    CoScopeContrastMutator,
+    CoScopeMouseMoved,
+    CoScopeCanvasMutator,
+    CovalLens,
+    CoScopeMouseDown,
+    CovalMouseDrawingLens,
+    CoScopeEditorSizeChosen,
+    EditorSizeLens,
+    CoScopePeacedOut,
+    CoScopePaintValuePicked, CoScopePaintValueMutator, CoScopeEditorSizeMutator
+} from "./model/coScope.ts";
+import { RecoScopeCanvasMutator } from "./model/recoScope.ts";
 
-export const EDITOR_SIZE = 128
+const DEFAULT_EDITOR_SIZE = 64
 
-export async function prepareImage(ib: ArrayBufferLike | HTMLCanvasElement): Promise<Image | string> {
-    let image;
-    try {
-        image = ib instanceof HTMLCanvasElement
-            ? Image.fromCanvas(ib)
-            : await Image.load(ib)
-        const iwx = image.width;
-        const iwy = image.height;
+export type DCTweakerAppState = {
+    inputImage: Image | null
+    groundImage: Image | null
+    editorSize: number
+    errorMessage: string
+    mouseXYV: [number, number, number?]
+    covals: number[]
+    coScopeContrastKnee: number
+    coScopeContrastPower: number
+    coScopeContrastBump: number
+    coScopePaintValue: number
+    recovals: number[]
+    mouseDrawing: boolean,
+    lastDrawnXY: [number, number],
+}
 
-        if (!(iwx == EDITOR_SIZE && iwy == EDITOR_SIZE)) {
-            let short_edge = Math.min(iwx, iwy);
-            if (iwx > EDITOR_SIZE || iwy > EDITOR_SIZE) {
-                image = image
-                    .crop({
-                        x: iwx / 2 - (short_edge / 2),
-                        y: iwy / 2 - (short_edge / 2),
-                        width: short_edge,
-                        height: short_edge
-                    })
-            }
-
-            image = image
-                .resize({
-                    width: EDITOR_SIZE,
-                    height: EDITOR_SIZE
-                })
-        }
-
-        const grey = image.grey()
-        return grey
+const CanvasResetRequested: PSPGagReflex<DCTweakerAppState, {editorSize: number}> =  ( {editorSize}) => {
+    return {
+        editorSize: editorSize,
+        covals: Array(editorSize*editorSize).fill(0),
     }
-    catch (e: any) { return e.message }
+}
+
+type DCTweakerActions =
+    | "resetCanvas"
+    | "editorSizeChoice"
+    | "sampleChoice"
+    | "coScopeMove"
+    | "coScopeDown"
+    | "coScopePeace"
+    | "contrastPicker"
+    | "paintValuePicker"
+
+const actions: PSPActions<DCTweakerActions, DCTweakerAppState> = {
+    resetCanvas: CanvasResetRequested,
+    sampleChoice: SampleImageClicked,
+    coScopeMove: CoScopeMouseMoved,
+    coScopeDown: CoScopeMouseDown,
+    coScopePeace: CoScopePeacedOut,
+    contrastPicker: CoScopeContrastPicked,
+    editorSizeChoice: CoScopeEditorSizeChosen,
+    paintValuePicker: CoScopePaintValuePicked,
+}
+
+customElements.define('psp-host', PSPHost)
+
+document.addEventListener('DOMContentLoaded', () => {
+    const pspHost = document.querySelector('psp-host') as PSPHost | null
+    if (!pspHost) {
+        console.error("No PSP host!")
+        return
+    }
+
+    let sewerModel = GrowPSPModel<DCTweakerAppState, {}>({}, {}, {})
+
+    sewerModel = sewerModel.attachLens('errorMessage', FlatLens('errorMessage'))
+
+    let rcl = RecovalLens()
+    let cl = CovalLens(rcl)
+
+    let ccl = FlatLens<DCTweakerAppState, 'coScopeContrastKnee', number>('coScopeContrastKnee', [])
+    sewerModel = sewerModel.attachLens('coScopeContrastKnee', ccl, 0.5)
+
+    let ccpl = FlatLens<DCTweakerAppState, 'coScopeContrastPower', number>('coScopeContrastPower', [])
+    sewerModel = sewerModel.attachLens('coScopeContrastPower', ccpl, 5)
+
+    let ccbl = FlatLens<DCTweakerAppState, 'coScopeContrastBump', number>('coScopeContrastBump', [])
+    sewerModel = sewerModel.attachLens('coScopeContrastBump', ccbl, 0)
+
+    sewerModel = sewerModel.attachLens('covals', cl, [])
+
+    let ldxyl = FlatLens<DCTweakerAppState, 'lastDrawnXY', [number, number]>('lastDrawnXY', [])
+    sewerModel = sewerModel.attachLens('lastDrawnXY', ldxyl, [-1, -1])
+
+    let cidl = CovalMouseDrawingLens(cl, ldxyl)
+    sewerModel = sewerModel.attachLens('mouseDrawing', cidl, false)
+    sewerModel = sewerModel.attachLens('mouseXYV', CoScopeMouseLens(cl, ldxyl), [0, 0])
+
+    sewerModel = sewerModel.attachLens('recovals', rcl, [])
+
+    let gil = GroundImageLens(cl)
+    let iil = InputImageLens(gil)
+    sewerModel = sewerModel.attachLens('groundImage', gil, null)
+    sewerModel = sewerModel.attachLens('inputImage', iil, null)
+    sewerModel = sewerModel.attachLens('editorSize', EditorSizeLens(iil, cl), DEFAULT_EDITOR_SIZE)
+    sewerModel = sewerModel.attachLens('coScopePaintValue', FlatLens('coScopePaintValue', ['coEditorPaintValuePicker']), 30.0)
+
+    sewerModel = sewerModel.mapSewers({
+        'drop-canvas': {
+            drainId: 'drop-canvas-drain',
+            buildDrainElement: DivDrain,
+            mutator: GroundCanvasToInnerHTML
+        },
+        'coScope': {
+            drainId: 'cosine-scope-drain',
+            buildDrainElement: DivDrain,
+            mutator: CoScopeCanvasMutator()
+        },
+        'recoScope': {
+            drainId: 'reconstruction-scope-drain',
+            buildDrainElement: DivDrain,
+            mutator: RecoScopeCanvasMutator()
+        },
+        'coEditorMouseX': {
+            drainId: 'mouse-x-drain',
+            buildDrainElement: DivDrain,
+            mutator: (appState, ownEl) => { ownEl.innerHTML = appState.mouseXYV?.[0]?.toString() ?? '0' }
+        },
+        'coEditorMouseY': {
+            drainId: 'mouse-y-drain',
+            buildDrainElement: DivDrain,
+            mutator: (appState, ownEl) => { ownEl.innerHTML = appState.mouseXYV?.[1]?.toString() ?? '0' }
+        },
+        'coEditorMouseV': {
+            drainId: 'mouse-v-drain',
+            buildDrainElement: DivDrain,
+            mutator: (appState, ownEl) => { ownEl.innerHTML = appState.mouseXYV?.[2]?.toString() ?? 'ø' }
+        },
+        'coEditorContrastControls': {
+            drainId: 'cosine-contrast-control-drain',
+            buildDrainElement: DivDrain,
+            mutator: CoScopeContrastMutator()
+        },
+        'coEditorPaintValuePicker': {
+            drainId: 'cosine-editor-paint-value-drain',
+            buildDrainElement: DivDrain,
+            mutator: CoScopePaintValueMutator()
+        },
+        'coEditorSizeControl': {
+            drainId: 'cosine-editor-size-control-drain',
+            buildDrainElement: DivDrain,
+            mutator: CoScopeEditorSizeMutator()
+        }
+    })
+
+    const useActions = sewerModel.useModel()
+    const dispatch = useActions(actions)
+
+    pspHost.installDrains(sewerModel)
+
+    dispatch({ type: 'resetCanvas', payload: { editorSize: 64 }})
+
+    // @ts-ignore
+    window._act = (s, e) => {
+        dispatch({ type: s, payload: e })
+    }
+})
+
+function InputImageLens(
+    groundImage: PSPLens<DCTweakerAppState, 'groundImage'>
+): PSPLens<DCTweakerAppState, 'inputImage'> {
+
+    return {
+        key: 'inputImage',
+        marks: ['drop-canvas', 'coScope, recoScope'],
+        pik(bag) {
+            return bag.inputImage
+        },
+        put(bag, inputIm) {
+            if (!inputIm) { return { ...bag, inputImage: null } }
+
+            let im = resizeAndGreyscale(inputIm, bag.editorSize ?? DEFAULT_EDITOR_SIZE)
+
+            if (typeof im === 'string') {
+                return {
+                    ...bag,
+                    inputImage: null,
+                    errorMessage: im
+                }
+            } else {
+                return groundImage.put({
+                    ...bag,
+                    inputImage: inputIm,
+                }, im)
+            }
+        }
+    }
+}
+
+
+function RecovalLens(): PSPLens<DCTweakerAppState, 'recovals'> {
+    return ({
+        key: 'recovals',
+        marks: ['recoScope'],
+        pik(bag) {
+            return bag['covals']
+        },
+
+        put(bag, recovals, yuck) {
+            const bagPrime = { ...bag, recovals, markDirty: yuck }
+
+            if (yuck) { yuck.markDirty(this.marks) }
+
+            return bagPrime
+        },
+
+    })
 }
 
 // Just some expensive nested loops below here

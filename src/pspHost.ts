@@ -1,9 +1,4 @@
-import { Image } from 'image-js'
-import { dctII2, inverseDctII2, prepareImage } from "./dctweaking"
-
-const EDITOR_SIZE = 128
-
-type LensesForKeysOf<StateModel extends object> = Partial<{ [LK in keyof StateModel & string]: PSPLens<StateModel, LK> }>
+const DEBUG_MARK_DIRTY = false
 
 /**
  * A PSP Model lets you add interactivity to some <psp-host>-hosted markup by treating every <slot> tag in the <psp-host>
@@ -14,12 +9,12 @@ type LensesForKeysOf<StateModel extends object> = Partial<{ [LK in keyof StateMo
  * @param _sewers A map of some DOM IDs to sewers. Each sewer has a way to build its drain (in the DOM, which will get that DOM ID), and a function from model state to sewer mutation side effects.
  * @returns 
  */
-function GrowPSPModel<
+export function GrowPSPModel<
     SM extends object,
     DO extends Partial<SM>,
 >(
     _depths: DO = ({} as DO),
-    _lenses: LensesForKeysOf<SM> = {},
+    _lenses: Partial<{ [LK in keyof SM & string]: PSPLens<SM, LK> }> = {},
     _sewers: PSPMutationSewers<string, SM> = {}
 ): PSPSewerModel<SM> {
     return {
@@ -30,7 +25,7 @@ function GrowPSPModel<
         attachLens: <K extends keyof SM & string>(key: K, l: PSPLens<SM, K> = FlatLens(key), iv?: SM[K]) => {
             let _lPrime = { ..._lenses, [key]: l }
             let _dPrime = structuredClone(_depths)
-            if (iv) {
+            if (typeof iv !== "undefined") {
                 _dPrime = l.put(_depths, iv)
             }
 
@@ -42,24 +37,37 @@ function GrowPSPModel<
             return GrowPSPModel(structuredClone(_depths), _lenses, sewers)
         },
         useModel: () => {
-            function _markDirty(marks: PSPMutationSewer<SM>[]) {
-                /**
-                 * TODO #3 DOM Updates: Call these as async parallel, or instead push to 
-                 * a queue that a webworker drains serially?
-                 */
-                for (let { mutator, drainId } of marks) {
-                    const drain = document.getElementById(drainId) as HTMLElement
-                    if (!drain) {
-                        console.error(`_markDirty() | Can't update #${drainId}. It is no longer in the document.`)
-                        continue
+            const yuck: PSPYuckFlusher = {
+                dirtySet: new Set<string>(),
+                markDirty(marks: string[]) {
+                    const foundSewerNames = marks.filter(m => m in _sewers)
+                    if (foundSewerNames.length !== marks.length) {
+                        const missing = marks.filter(m => !(m in _sewers))
+                        console.warn(`_markDirty() | A lens is trying to mark a missing sewer: ${missing}.`)
                     }
-                    mutator(_depths, drain)
+
+                    foundSewerNames.forEach(x => this.dirtySet.add(x))
+                },
+                flush() {
+                    let markables: PSPMutationSewer<SM>[] = []
+                    for (let dirtyName of this.dirtySet) {
+                        markables.push(_sewers[dirtyName])
+                    }
+
+                    for (let { mutator, drainId } of markables) {
+                        const drain = document.getElementById(drainId) as HTMLElement
+                        if (!drain) {
+                            console.error(`_markDirty() | Can't update #${drainId}. It is no longer in the document.`)
+                            continue
+                        }
+                        DEBUG_MARK_DIRTY && console.log("Going to mark dirty: ", drain.id, drainId);
+                        mutator(_depths, drain)
+                    }
                 }
             }
 
             return function useActions<D extends string>(actions: PSPActions<D, SM>) {
                 return async ({ type, payload }: { type: D, payload: any }) => {
-                    console.log("In dispatch callback")
                     let upset = await actions[type](payload)
                     for (let [key, value] of Object.entries(upset)) {
                         const updatedLens: PSPLens<SM, keyof SM> = _lenses[key]
@@ -67,64 +75,64 @@ function GrowPSPModel<
                             console.error(`useActions() | Can't find lens ${key}.`)
                             continue
                         }
-                        _depths = updatedLens.put(_depths, value as any)
-                        _markDirty(updatedLens.marks(_sewers))
+                        _depths = updatedLens.put(_depths, value as any, yuck)
                     }
+                    yuck.flush()
                 }
             }
         }
     }
 }
 
-type PSPLens<StateModel extends object, K extends keyof StateModel> = {
-    key: K,
-
-    pik: (_: Partial<StateModel>) => Partial<StateModel>[K] | null,
-
-    put: <O>(upon: O, wat: StateModel[K]) => (O & { [_k in K]: StateModel[K] }),
-
-    marks: <M extends PSPMutationSewers<string, StateModel>>(outlets: M) => PSPMutationSewer<StateModel>[]
+interface PSPYuckFlusher {
+    dirtySet: Set<string>,
+    markDirty: (marks: string[]) => void,
+    flush: () => void
 }
 
-type PSPActions<DispatchNames extends string, StateModel extends object> = {
-    [dispatchName in DispatchNames]: (payload: any) => Promise<Partial<StateModel>> | Partial<StateModel>
+/**
+ * A simple key-value getter/setter with no changes to other places.
+ * @param k 
+ * @param forOutlets
+ * @returns 
+ */
+export function FlatLens<
+    SM extends object,
+    K extends keyof SM & string,
+    V extends SM[K]
+>(k: K, forOutlets: string[] = [k.toString()]): PSPLens<SM, K> {
+    return ({
+        key: k,
+        marks: forOutlets,
+        pik(bag: Partial<SM>) {
+            if (!(k in bag)) {
+                throw new TypeError(`Missing key ${k} in data bag. ` +
+                    `Consider adding an initalizer in the call to attachLens(${k}).` +
+                    `Known keys: ${Object.keys(bag)}.`)
+            }
+
+            return bag[k]
+        },
+
+        put(bag, wat, yuck) {
+            const _statePrime = { ...bag, ...({ [k]: wat } as Record<K, V>) }
+
+            if (yuck) { yuck.markDirty(this.marks) }
+
+            return _statePrime
+        },
+    })
 }
 
-const actions: PSPActions<"sampleChoice" | "coScopePoint", CosineEditorAppState> = {
-    sampleChoice: prepareSampleImage,
-    coScopePoint: coScopeHandlePoint,
+export function DivDrain(ownedSlot: HTMLSlotElement) {
+    const sms = document.createElement('div')
+    sms.slot = ownedSlot.name
+    sms.innerHTML = ownedSlot.innerHTML
+    return sms
 }
 
-type UseActions<I extends object> = <D extends string>
-    (actions: PSPActions<D, I>) => (_: { type: D, payload: any }) => void
 
-type PSPSewerModel<DataPool extends {}> = {
-    _depths: Partial<DataPool>,
-    _lenses: Partial<{ [LK in keyof DataPool & string]: PSPLens<DataPool, LK> }>,
-    sewers: PSPMutationSewers<string, DataPool>,
-    attachLens: <K extends keyof DataPool & string>(k: K, l: PSPLens<DataPool, K>, iv?: DataPool[K]) => PSPSewerModel<DataPool>,
-    mapSewers: (sewers: PSPMutationSewers<string, DataPool>) => PSPSewerModel<DataPool>
-    useModel: () => UseActions<DataPool>
-}
-
-type PSPMutationSewer<StateModel extends object> = {
-    drainId: string,
-    buildDrainElement: (ownSlot: HTMLSlotElement) => HTMLElement,
-    mutator: PSPDOMDrainage<Partial<StateModel>>
-}
-
-type PSPMutationSewers<
-    SlotNames extends string,
-    StateModel extends object,
-> = {
-        [sn in SlotNames]: PSPMutationSewer<StateModel>
-    }
-
-type PSPDOMDrainage<StateModel extends object> = (curState: StateModel, drain: HTMLElement) => void
-
-
-
-class PSPHost extends HTMLElement {
+export class PSPHost extends HTMLElement {
     hostEl: HTMLElement
 
     constructor() {
@@ -158,258 +166,94 @@ class PSPHost extends HTMLElement {
             const sms = sewerModel.sewers[sewerMapSlotName].buildDrainElement(ownedSlot)
             sms.id = sewerModel.sewers[sewerMapSlotName].drainId
             this.hostEl.appendChild(sms)
+
+            const dirtyingLenses: PSPLens<StateModel, keyof StateModel>[] = (Object
+                .values(sewerModel._lenses)
+                .filter((l: any) => l.marks.includes(sewerMapSlotName)) as PSPLens<StateModel, keyof StateModel>[])
+
+            if (dirtyingLenses.length > 0) {
+                sewerModel.sewers[sewerMapSlotName].mutator(sewerModel._depths, sms)
+            }
         }
     }
 }
 
-function FlatLens<
+
+export interface PSPLens<StateModel extends object, K extends keyof StateModel> {
+    key: K,
+
+    /**
+     * Given a bag of data, pick a record out from it.
+     *
+     * @param dataBag Some object-type bag of data, hopefully implementing all of StateModel
+     * @returns The K record's value from dataBag, or null if key K is missing.
+     */
+    pik: (dataBag: Partial<StateModel>) => Partial<StateModel>[K] | null,
+
+    /**
+     * Given a lump of data and a value, do whatever to build a new lump that has the value
+     * represented within it.
+     *
+     * @param from The object to 'act upon' (even though this returns a new object)
+     * @param wat The value that's getting updated at key K. Other values might get updated too.
+     * @returns A new lump of data with the update to key K represented.
+     */
+    put: <O extends Partial<StateModel>>(
+        from: O,
+        wat: StateModel[K],
+        yucky?: PSPYuckFlusher
+    ) => (O & { [_k in K]: StateModel[K] }),
+
+    /**
+     * The list of sewer names that need to update in response to changes of K.
+     */
+    marks: string[]
+}
+
+/**
+ * List different sorts of actions the user can take as the keys of the PSPActions object, and give
+ * functions from any kind of action data to updated State Model records as the values. These functions
+ * can be async.
+ *
+ * Example:
+ * ```
+ * const myChessActions = {
+ *   clickedChessboard: async function computeActiveSquare(MouseEvent: e) => { ... return { activeSquare: "E5" } },
+ *   typedInChatWindow: function updateChatBoxState({ change: 'add', data: 'g' }) => { ... return { chatBoxContent: 'welp gg' },
+ * }
+ * ```
+ */
+export type PSPGagReflex<StateModel, P> = (payload: P) => Promise<Partial<StateModel>> | Partial<StateModel>
+export type PSPActions<StimulusNames extends string, StateModel extends object> = {
+    [dispatchName in StimulusNames]: PSPGagReflex<StateModel, any>
+}
+
+/**
+ * Takes the actions object and gives you a dispatch function that you can use to fire them off.
+ */
+export type UseActions<I extends object> = <D extends string>
+    (actions: PSPActions<D, I>) => (_: { type: D, payload: any }) => void
+
+export type PSPSewerModel<DataPool extends {}> = {
+    _depths: Partial<DataPool>,
+    _lenses: Partial<{ [LK in keyof DataPool & string]: PSPLens<DataPool, LK> }>,
+    sewers: PSPMutationSewers<string, DataPool>,
+    attachLens: <K extends keyof DataPool & string>(k: K, l: PSPLens<DataPool, K>, iv?: DataPool[K]) => PSPSewerModel<DataPool>,
+    mapSewers: (sewers: PSPMutationSewers<string, DataPool>) => PSPSewerModel<DataPool>
+    useModel: () => UseActions<DataPool>
+}
+
+export type PSPDrainMutator<StateModel> = (curState: Partial<StateModel>, drain: HTMLElement) => void | Promise<void>
+export type PSPMutationSewer<StateModel extends object> = {
+    drainId: string,
+    buildDrainElement: (ownSlot: HTMLSlotElement) => HTMLElement,
+    mutator: PSPDrainMutator<StateModel>
+}
+
+
+export type PSPMutationSewers<
+    SlotNames extends string,
     StateModel extends object,
-    K extends keyof StateModel & string,
-    V extends StateModel[K]
->(k: K, forOutlet: string = k.toString()): PSPLens<StateModel, K> {
-    return ({
-        key: k,
-        pik(bag: Partial<StateModel>) {
-            if (!(k in bag)) {
-                throw new TypeError(`Missing key ${k} in ${JSON.stringify(bag)}.`)
-            }
-
-            return bag[k]
-        },
-
-        put(bag, wat) { return { ...bag, ...({ [k]: wat } as Record<K, V>) } },
-
-        marks(sewer: PSPMutationSewers<string, StateModel>) {
-            if (!sewer[forOutlet]) {
-                console.warn("Can't find outlet: ", forOutlet)
-                console.warn("Available: ", Object.keys(sewer))
-                return []
-            }
-            return [sewer[forOutlet]]
-        }
-    })
-}
-
-function GroundImageLens(covals: PSPLens<CosineEditorAppState, 'covals'>): PSPLens<CosineEditorAppState, 'groundImage'> {
-    return ({
-        key: 'groundImage',
-        pik(bag) {
-            return bag['groundImage']
-        },
-
-        put(bag, groundImage) {
-            if (!groundImage) {
-                return { ...bag, groundImage }
-            }
-
-            // Ground image updated, which implies covals should be
-            // recomputed from them once.
-            const lumas = Uint8Array.from(groundImage.data)
-            const cov = dctII2(lumas, EDITOR_SIZE)
-            console.info('(GroundImageLens) Recomputed covals.')
-            console.log(cov.length, cov)
-
-            return covals.put({
-                ...bag,
-                groundImage,
-            }, cov)
-        },
-
-        marks(outlets) { return [outlets['coScope'], outlets['drop-canvas'], outlets['recoScope']] },
-    })
-}
-
-function RecovalLens(): PSPLens<CosineEditorAppState, 'recovals'> {
-    return ({
-        key: 'recovals',
-        pik(bag) {
-            return bag['covals']
-        },
-
-        put(bag, recovals) {
-            return {
-                ...bag,
-                recovals
-            }
-        },
-
-        marks(outlets) { return [outlets['recoScope']] },
-    })
-}
-
-function CovalLens(recovals: PSPLens<CosineEditorAppState, 'recovals'>): PSPLens<CosineEditorAppState, 'covals'> {
-    return ({
-        key: 'covals',
-        pik(bag) {
-            return bag['covals']
-        },
-        put(bag, covals) {
-            const revals = inverseDctII2(covals, EDITOR_SIZE)
-            console.info('Recomputed recovals.')
-            return recovals.put({
-                ...bag,
-                covals
-            }, revals)
-        },
-        marks(outlets) {
-            return [outlets['coScope'], outlets['recoScope']]
-        },
-    })
-}
-
-async function prepareSampleImage(e: PointerEvent) {
-    if (!e.target) {
-        return { errorMessage: 'Got a click, but it aint for nothin.' }
+> = {
+        [sn in SlotNames]: PSPMutationSewer<StateModel>
     }
-
-    let clicked = e.target as HTMLImageElement
-    if (!(e.target instanceof HTMLImageElement)) {
-        return { errorMessage: 'Need an image to prepare.' }
-    }
-
-    const _c = document.createElement('canvas')
-
-    _c.width = clicked.naturalWidth
-    _c.height = clicked.naturalHeight
-
-    const _ctx = _c.getContext('2d')
-    _ctx?.drawImage(clicked, 0, 0)
-
-    let im = await prepareImage(_c)
-
-    if (typeof im === 'string') {
-        return { errorMessage: im }
-    } else {
-        return { groundImage: im }
-    }
-}
-
-async function coScopeHandlePoint(e) {
-    const coCa = e.target;
-    const rect = coCa.getBoundingClientRect();
-
-    // Convert mouse position to canvas coordinates
-    const small_left = (e.clientX - rect.left)
-    const small_top = (e.clientY - rect.top)
-
-    const x = Math.floor(small_left * (coCa.width / rect.width));
-    const y = Math.floor(small_top * (coCa.height / rect.width));
-
-    return { mouseXY: [x, y] as [number, number] }
-}
-
-
-type CosineEditorAppState = {
-    errorMessage: string,
-    mouseXY: [number, number],
-    covals: number[],
-    recovals: number[]
-    groundImage: Image | null
-}
-
-function DivDrain(ownedSlot: HTMLSlotElement) {
-    const sms = document.createElement('div')
-    sms.slot = ownedSlot.name
-    sms.innerHTML = ownedSlot.innerHTML
-    return sms
-}
-
-customElements.define('psp-host', PSPHost)
-document.addEventListener('DOMContentLoaded', () => {
-    const pspHost = document.querySelector('psp-host') as PSPHost | null
-    if (!pspHost) {
-        console.error("No PSP host!")
-        return
-    }
-
-    let sewerModel = GrowPSPModel<CosineEditorAppState, {}>({}, {}, {})
-
-    sewerModel = sewerModel.attachLens('errorMessage', FlatLens('errorMessage'))
-    sewerModel = sewerModel.attachLens('mouseXY', FlatLens('mouseXY', 'coEditorMouseX'), [0, 0])
-
-    let rcl = RecovalLens()
-    let cl = CovalLens(rcl)
-
-    sewerModel = sewerModel.attachLens('covals', cl, [])
-    sewerModel = sewerModel.attachLens('covals', rcl, [])
-    sewerModel = sewerModel.attachLens('groundImage', GroundImageLens(cl), null)
-
-    const ReplacingGroundImageCanvas = (appState, ownDrain) => {
-        ownDrain.innerHTML = ''
-        if (appState.groundImage) {
-            ownDrain.appendChild(appState.groundImage.getCanvas())
-        }
-    }
-
-    const FirstCanvasDataSlap = (stateKey: string, dbgName: string) => (appState, ownDrain) => {
-        const _dbi = `SlapDataInFirstChildCanvas(${stateKey},${dbgName})`
-        let _canvas = ownDrain.querySelector('canvas')
-
-        if (!_canvas) {
-            console.error(`${_dbi} | No canvas to slap data into.`)
-            return
-        }
-
-        _canvas.width = EDITOR_SIZE
-        _canvas.height = EDITOR_SIZE
-        let _ctx = _canvas.getContext('2d')
-        if (!_ctx) {
-            console.error(`${_dbi} | Failed to acquire a canvas context.`)
-            return
-        }
-
-        // @ts-ignore
-        _ctx.mozImageSmoothingEnabled = false
-        _ctx.imageSmoothingEnabled = false
-
-        let vals = appState[stateKey]
-        const outData = new Uint8ClampedArray(vals.length * 4)
-
-        const iv = vals
-        iv.forEach((v, i) => {
-            outData[4 * i + 0] = v
-            outData[4 * i + 1] = v
-            outData[4 * i + 2] = v
-            outData[4 * i + 3] = 255
-        })
-        console.log(_ctx)
-
-        console.log(vals)
-        console.log(vals.length, EDITOR_SIZE)
-        const imData = new ImageData(outData, EDITOR_SIZE, EDITOR_SIZE)
-        _ctx.putImageData(imData, 0, 0)
-    }
-
-    sewerModel = sewerModel.mapSewers({
-        'drop-canvas': {
-            drainId: 'drop-canvas-drain',
-            buildDrainElement: DivDrain,
-            mutator: ReplacingGroundImageCanvas
-        },
-        'coScope': {
-            drainId: 'cosine-scope-drain',
-            buildDrainElement: DivDrain,
-            mutator: FirstCanvasDataSlap('covals', 'cosine-scope-drain')
-        },
-        'recoScope': {
-            drainId: 'reconstruction-scope-drain',
-            buildDrainElement: DivDrain,
-            mutator: FirstCanvasDataSlap('recovals', 'reconstruction-scope-drain')
-        },
-        'coEditorMouseX': {
-            drainId: 'mouse-x-drain',
-            buildDrainElement: DivDrain,
-            mutator: (appState, ownEl) => { ownEl.innerHTML = appState.mouseXY?.[0]?.toString() ?? '0' }
-        }
-    })
-
-    const useActions = sewerModel.useModel()
-    const dispatch = useActions(actions)
-
-    pspHost.installDrains(sewerModel)
-
-    // @ts-ignore
-    window._act = (s, e) => {
-        dispatch({ type: s, payload: e })
-    }
-})

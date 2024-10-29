@@ -1,3 +1,7 @@
+* {
+    outline: none !important;
+}
+
 :root {
     outline: 1px solid #ccc;
 
@@ -116,4 +120,24 @@ canvas {
 
 canvas[height="1"] + .scope-shade {
     display: flex;
+}
+
+.slidecontainer {
+    display: grid;
+    grid-template-columns: 8rem 1fr 50%;
+    outline: 1px solid blue;
+    row-gap: 0.5rem;
+}
+
+.inverted {
+    padding: 0.2em;
+    background-color: #646cff;
+    color: white;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-size: small;
+}
+
+.inverted.dulled {
+    background-color: #AAA;
 }
