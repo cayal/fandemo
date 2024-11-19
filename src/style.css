@@ -141,3 +141,8 @@ canvas[height="1"] + .scope-shade {
 .inverted.dulled {
     background-color: #AAA;
 }
+
+output#editor-size-output {
+    width: 2rem;
+}
+

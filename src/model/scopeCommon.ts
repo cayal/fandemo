@@ -19,7 +19,7 @@ export function PostProcessable(vals: number[], one: (x: number) => number): Pos
     }
 }
 
-export function log(vals: number[], power: number): PostProcessed {
+export function log(vals: number[]): PostProcessed {
     return PostProcessable(vals, (x: number) => Math.log(x))
 }
 

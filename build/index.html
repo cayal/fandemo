@@ -1,32 +1,158 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>DCTweaker2</title>
-      <script type="module" crossorigin src="/static/index-DaKOjhqt.js"></script>
-      <link rel="stylesheet" crossorigin href="/static/style-C-4u5yYr.css">
-    </head>
-    <body>
-        <h1><a id="sevener" href="#">Hello, world!</a></h1>
-        <div class='staging-area'>
-            <div class="staging-left">
-              <i>Samples</i>
-              <div class='image-samples'>
-                  <img src="/celeste.jpg" />
-                  <img src="/me.jpg" />
-                  <img src="/train.png" />
-              </div>
-              <div class='imdrop'>
-                <div id="drop-area">
-                  <p>To solve image cosines, choose a sample above, or drag and drop an image here.</p>
-                  <small>JPEG or PNG (no interlacing).</small>
-                  <div class="preview-tray" ref={_dropBackdrop}></div>
-                </div>
-              </div>
-            </div>
 
-        </div>
-        <div className='editing-area'>
-            <CosineEditor />
-        </div>
-    </body>
+<head>
+    <title>DCT Demo</title>
+  <script type="module" crossorigin src="/static/index-Cmtk4_Fo.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/style-D22olTjM.css">
+</head>
+<body>
+    <psp-host id="#psp-host">
+        <template shadowrootmode="open">
+            <div class="error-notice"><slot name="error-message"></slot></div>
+            <div class='staging-area'>
+                <div class="staging-left">
+                    <i>Samples</i>
+                    <div class='image-samples'>
+                        <img alt="A suspicious-looking cat" onclick="_act('sampleChoice', event)" src="/celeste.jpg" />
+                        <img alt="A suspicious-looking dude" onclick="_act('sampleChoice', event)" src="/me.jpg" />
+                        <img alt="Just a regular train" onclick="_act('sampleChoice', event)" src="/train.png" />
+                    </div>
+                    <div class='imdrop'>
+                        <div id="drop-area">
+                            <p>To solve image cosines, choose a sample above, or drag and drop an image here.</p>
+                            <small>JPEG or PNG (no interlacing).</small>
+                            <div class="drop-tray">
+                                <slot name="drop-canvas"></slot>
+                            </div>
+                        </div>
+                    </div>
+                    <slot name="coEditorSizeControl">
+                        <form class="slidecontainer" style="margin-top: 0.5rem; margin-bottom: 0.25rem">
+                            <label for="editor-size-picker" class="inverted">Editor size</label>
+                            <output for="editor-size-picker" name="contrast-knee-value">64</output>
+                            <input id="editor-size-picker"
+                                   type="range"
+                                   min="2"
+                                   max="64"
+                                   step="1"
+                                   class="slider"
+                                   oninput="_act('editorSizeChoice', event)"
+                            />
+                        </form>
+                    </slot>
+                </div>
+                <div class="staging-right">
+                    <h1>Cayal Walker</h1>
+                    <h2>Senior Javascript Engineer</h2>
+                    <h3><em>Candidate for Fandango</em></h3>
+                    <p>
+                        <b>Hello, NBC!</b> <br> This is an example of a <b>complex Web frontend</b> of the sort I love to build.
+                        I implemented this using <b>TypeScript</b> and <b>Standard DOM APIs</b> and it is <b>10x faster</b>
+                        than the equivalent version I built in <b>React</b>. The Discrete Cosine Transform is a ubiquitous
+                        algorithm used in <b>video streaming and image compression</b>.
+                    <hr>
+                    You can find the code for this program at: <a href="https://github.com/cayal/fandemo">github.com/cayal/fandemo</a>
+                    </p>
+                </div>
+            </div>
+            <div class='editing-area'>
+                <div class='cosines'>
+                    <table id="coordinates" class="datatabular">
+                        <tbody>
+                            <tr>
+                                <th class="inverted">x</th>
+                                <td><slot name="coEditorMouseX">0</slot></td>
+                            </tr>
+                            <tr>
+                                <th class="inverted">y</th>
+                                <td><slot name="coEditorMouseY">0</slot></td>
+                            </tr>
+                            <tr>
+                                <th class="inverted">=</th>
+                                <td><slot name="coEditorMouseV">&oslash;</slot></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <slot name="coEditorPaintValuePicker">
+                        <form class="slidecontainer">
+                            <label for="paint-value-picker" class="inverted">Painting with:</label>
+                            <output for="paint-value-picker" name="paint-value"></output>
+                            <input
+                                   id="paint-value-picker"
+                                   type="range"
+                                   min="-1000"
+                                   max="1000"
+                                   step="1"
+                                   class="slider"
+                                   oninput="_act('paintValuePicker', event)"
+                            />
+                        </form>
+                    </slot>
+
+                    <div class="scope-container" >
+                        <slot class="scope" name="coScope">
+                            <canvas width="1"
+                                    height="1"
+                                    onmousemove="_act('coScopeMove', event)"
+                                    onmousedown="_act('coScopeDown', event)"
+                                    onmouseleave="_act('coScopePeace', event)"
+                                    onmouseup="_act('coScopePeace', event)"
+                            ></canvas>
+                            <div class="scope-shade">Waiting...</div>
+                        </slot>
+                        <slot name="coEditorContrastControls">
+                            <form class="slidecontainer">
+                                <label for="contrast-knee-picker" class="inverted dulled">Contrast knee</label>
+                                <output for="contrast-knee-picker" name="contrast-knee-value"></output>
+                                <input disabled
+                                       id="contrast-knee-picker"
+                                       type="range"
+                                       min="0.5"
+                                       max="9.0"
+                                       step="0.01"
+                                       class="slider"
+                                       oninput="_act('contrastPicker', event)"
+                                />
+                                <label for="contrast-power-picker" class="inverted dulled">Power</label>
+                                <output for="contrast-power-picker" name="contrast-power-value"></output>
+                                <input disabled
+                                       id="contrast-power-picker"
+                                       type="range"
+                                       min="1.0"
+                                       max="10.0"
+                                       step="0.01"
+                                       class="slider"
+                                       oninput="_act('contrastPicker', event)"
+                                />
+                                <label for="contrast-bump-picker" class="inverted dulled">Bump</label>
+                                <output for="contrast-bump-picker" name="contrast-bump-value"></output>
+                                <input disabled
+                                       id="contrast-bump-picker"
+                                       type="range"
+                                       min="0.0"
+                                       max="1"
+                                       step="0.01"
+                                       class="slider"
+                                       oninput="_act('contrastPicker', event)"
+                                />
+                            </form>
+                        </slot>
+                    </div>
+                </div>
+
+                <div class='reconstructions'>
+                    <div class="scope-container" style="margin-top: 8.5rem">
+                        <slot class="scope" name="recoScope">
+                            <canvas width="1" height="1"></canvas>
+                            <div class="scope-shade">Waiting...</div>
+                        </slot>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </psp-host>
+</body>
+
 </html>

@@ -34,7 +34,7 @@
                     <slot name="coEditorSizeControl">
                         <form class="slidecontainer" style="margin-top: 0.5rem; margin-bottom: 0.25rem">
                             <label for="editor-size-picker" class="inverted">Editor size</label>
-                            <output for="editor-size-picker" name="contrast-knee-value">64</output>
+                            <output id="editor-size-output" for="editor-size-picker" name="editor-size-output">64</output>
                             <input id="editor-size-picker"
                                    type="range"
                                    min="2"
@@ -48,7 +48,7 @@
                 </div>
                 <div class="staging-right">
                     <h1>Cayal Walker</h1>
-                    <h2>Senior Javascript Engineer</h2>
+                    <h2>Senior Software Engineer</h2>
                     <h3><em>Candidate for Fandango</em></h3>
                     <p>
                         <b>Hello, NBC!</b> <br> This is an example of a <b>complex Web frontend</b> of the sort I love to build.
@@ -147,7 +147,9 @@
                 </div>
 
                 <div class='reconstructions'>
-                    <div class="scope-container" style="margin-top: 8.5rem">
+                    <div></div>
+                    <div></div>
+                    <div class="scope-container">
                         <slot class="scope" name="recoScope">
                             <canvas width="1" height="1"></canvas>
                             <div class="scope-shade">Waiting...</div>

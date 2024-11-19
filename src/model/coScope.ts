@@ -1,7 +1,6 @@
-import { Image} from 'image-js'
 import {PSPDrainMutator, PSPLens} from "../pspHost.ts";
 import {DCTweakerAppState, inverseDctII2} from "../dctweaking.ts";
-import {resizeAndGreyscale} from "./groundImage.ts";
+
 import {
     checksum,
     domain0toN,
@@ -15,13 +14,6 @@ import {
 
 const DEBUG_VERBOSE = false
 const CHANNELS = ['R','G','B','A'].length
-enum ColorModel {
-    GREY = 'GREY',
-    RGB = 'RGB',
-    HSL = 'HSL',
-    HSV = 'HSV',
-    CMYK = 'CMYK',
-}
 
 export function EditorSizeLens(
     inputImage: PSPLens<DCTweakerAppState, 'inputImage'>,
@@ -29,7 +21,7 @@ export function EditorSizeLens(
 ): PSPLens<DCTweakerAppState, 'editorSize'> {
     return ({
         key: 'editorSize',
-        marks: ['drop-canvas', 'recoScope', 'coEditorContrastControls'],
+        marks: ['drop-canvas', 'recoScope', 'coEditorContrastControls', 'coEditorSizeControl'],
         pik(bag) {
             return bag['editorSize']
         },
@@ -224,11 +216,11 @@ export function CoScopeMouseLens(
     })
 }
 
-export async function CoScopePeacedOut(e) {
+export async function CoScopePeacedOut() {
     return { mouseDrawing : false }
 }
 
-export async function CoScopeMouseDown(e) {
+export async function CoScopeMouseDown() {
     return { mouseDrawing: true }
 }
 
@@ -326,7 +318,9 @@ export function CoScopePaintValueMutator(): PSPDrainMutator<DCTweakerAppState> {
 export function CoScopeEditorSizeMutator(): PSPDrainMutator<DCTweakerAppState> {
     return async(appState, ownEl) => {
         const pvi = ownEl.querySelector('input#editor-size-picker') as HTMLInputElement
+        const pvo = ownEl.querySelector('output#editor-size-output') as HTMLInputElement
         pvi.value = appState.editorSize?.toFixed(0) ?? ''
+        pvo.value = appState.editorSize?.toFixed(0) ?? ''
     }
 }
 

@@ -2,6 +2,148 @@
     outline: none !important;
 }
 
+:root {
+    outline: 1px solid #ccc;
+
+    display: flex;
+    flex-direction: column;
+
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-synthesis: none;
+
+    line-height: 1.5;
+    font-weight: 400;
+
+    color-scheme: light dark;
+    color: rgba(255, 255, 255, 0.87);
+    background-color: #242424;
+
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+    font-weight: 500;
+    color: #646cff;
+    text-decoration: underline;
+}
+
+a:hover {
+    color: #535bf2;
+}
+
+body {
+    outline: 1px solid lime;
+    min-width: 960px;
+    max-width: 1280px;
+    min-height: 100vh;
+    margin: 0 auto;
+    display: flex;
+    flex-direction:column;
+}
+
+h1 {
+    font-size: 3.2em;
+    line-height: 1.1;
+}
+
+button {
+    border-radius: 8px;
+    border: 1px solid transparent;
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    font-family: inherit;
+    background-color: #1a1a1a;
+    cursor: pointer;
+    transition: border-color 0.25s;
+}
+
+button:hover {
+    border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+    outline: 4px auto -webkit-focus-ring-color;
+}
+
+
+@media (prefers-color-scheme: light) {
+    :root {
+        color: #213547;
+        background-color: #ffffff;
+    }
+
+    a:hover {
+        color: #747bff;
+    }
+
+    button {
+        background-color: #f9f9f9;
+    }
+}
+
+#error-message-hole:not(:empty) {
+    border-radius: 3px;
+    outline-style: inset;
+    outline: 1px solid #350024;
+    color: #350024;
+    background-color: #ff9c9c;
+}
+
+.scope-shade {
+    display: none;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    font-style: italic;
+    font-size: 2rem;
+    color: white;
+    height: 100%;
+    width: 100%;
+}
+
+canvas[height="1"] {
+    display: none;
+}
+
+canvas {
+    width: 100%;
+    image-rendering: pixelated;
+}
+
+canvas[height="1"] + .scope-shade {
+    display: flex;
+}
+
+.slidecontainer {
+    display: grid;
+    grid-template-columns: 8rem 1fr 50%;
+    outline: 1px solid blue;
+    row-gap: 0.5rem;
+}
+
+.inverted {
+    padding: 0.2em;
+    background-color: #646cff;
+    color: white;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-size: small;
+}
+
+.inverted.dulled {
+    background-color: #AAA;
+}* {
+    outline: none !important;
+}
+
 .highlight {
     outline: 3px solid #646cff;
     transition: ease-in 0.5s outline;
@@ -141,7 +283,7 @@ i.notice {
 .cosines,
 .reconstructions {
     display: grid;
-    grid-template-rows: 7em 1.75em 1fr;
+    grid-template-rows: 7em 1fr;
 }
 
 .scope-container .scope {
